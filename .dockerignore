@@ -1,0 +1,8 @@
+.git
+.gitignore
+.dockerignore
+.env
+.codex
+myenv
+__pycache__/
+*.py[cod]

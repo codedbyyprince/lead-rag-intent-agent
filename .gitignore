@@ -1,3 +1,5 @@
 myenv
 .env
 .codex
+__pycache__/
+*.py[cod]
