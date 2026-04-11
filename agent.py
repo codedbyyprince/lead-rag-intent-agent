@@ -2,10 +2,10 @@ import os
 import json
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.prompts import ChatPromptTemplate
-from tools import greeting, fetech_info, mock_lead_capture
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
+from tools import fetch_info, mock_lead_capture
 
-load_dotenv() 
+load_dotenv()
 
 api_key = os.getenv("GOOGLE_API_KEY")
 if not api_key:
@@ -17,64 +17,58 @@ model = ChatGoogleGenerativeAI(
     google_api_key=api_key,
 )
 
-# load knowledge
-knowledge_data = fetech_info("")
+knowledge_data = fetch_info()
 
-system_prompt = """You are AutoStream's AI assistant. Your job is to:
+SYSTEM_PROMPT = f"""You are AutoStream's friendly AI assistant. AutoStream is a SaaS product that provides automated video editing tools for content creators.
 
+Your job:
 1. Greet users warmly
-2. Answer questions about AutoStream pricing and features using the knowledge base below
-3. Detect if a user has high intent to buy
-4. Collect lead information (name, email, platform) when appropriate
+2. Answer questions about AutoStream using ONLY the knowledge base below
+3. Detect high intent to buy (signals: "want to try", "sign up", "ready to buy", "get started", "subscribe")
+4. When high intent detected, collect name, email, and creator platform ONE AT A TIME
+5. Only call LEAD_CAPTURE after collecting all three
 
-**Knowledge Base:**
-{knowledge}
+Knowledge Base:
+{json.dumps(knowledge_data, indent=2)}
 
-**Rules:**
-- Only provide information from the knowledge base
-- If asked about something not in the knowledge base, say you don't have that information
-- Detect high-intent signals like "want to try", "ready to buy", "subscribe", "sign up"
-- When you detect high-intent, explicitly ask for: name, email, and creator platform
-- Only call lead capture when ALL three pieces of information are provided
-- Keep responses concise and natural"""
+Rules:
+- Only answer from knowledge base for product questions
+- For general questions about what you can do, explain you help with AutoStream pricing and features
+- When collecting lead info, ask for one field at a time
+- When you have all three (name, email, platform), respond with exactly:
+  LEAD_CAPTURE::name::email::platform
+- Never trigger LEAD_CAPTURE early
+- Keep responses short and natural"""
 
-chat_prompt = ChatPromptTemplate.from_messages([
-    ("system", system_prompt),
-    ("human", "{query}")
-])
-
-# conversation history
-conversation = []
+conversation_history = []
+lead_captured = False
 
 print("Chat with AutoStream. Type 'quit' to exit.\n")
 
 while True:
-    query = input("You: ")
-    
-    if query == 'quit':
+    query = input("You: ").strip()
+
+    if query.lower() == 'quit':
         break
-    
-    # add to history
-    conversation.append(("user", query))
-    
-    # format messages for model
-    messages = chat_prompt.format_messages(
-        query=query,
-        knowledge=json.dumps(knowledge_data, indent=2)
-    )
-    
-    # add conversation history
-    for role, text in conversation[:-1]:  # exclude current message
-        if role == "user":
-            messages.insert(-1, {"role": "user", "content": text})
-        else:
-            messages.insert(-1, {"role": "assistant", "content": text})
-    
-    # get response
+
+    conversation_history.append(HumanMessage(content=query))
+
+    messages = [SystemMessage(content=SYSTEM_PROMPT)] + conversation_history
+
     response = model.invoke(messages)
     response_text = response.content
-    
-    # add to history
-    conversation.append(("assistant", response_text))
-    
+
+    if "LEAD_CAPTURE::" in response_text and not lead_captured:
+        try:
+            parts = response_text.strip().split("::")
+            name = parts[1]
+            email = parts[2]
+            platform = parts[3]
+            mock_lead_capture(name, email, platform)
+            lead_captured = True
+            response_text = f"Perfect! I've captured your details successfully. Welcome to AutoStream, {name}! We'll be in touch at {email} soon."
+        except Exception:
+            response_text = "I had trouble saving your details. Could you please share your name, email, and platform again?"
+
+    conversation_history.append(AIMessage(content=response_text))
     print(f"Assistant: {response_text}\n")
