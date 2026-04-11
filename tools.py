@@ -12,7 +12,7 @@ def fetch_info():
 def mock_lead_capture(name, email, platform):
     print(f"Lead captured successfully: {name}, {email}, {platform}")
     supabase.table("Lead-info").insert({
-        "name": name,
-        "email_address": email,
-        "platform": platform
+        "Name": name,
+        "Email_address": email,
+        "Platform": platform
     }).execute()

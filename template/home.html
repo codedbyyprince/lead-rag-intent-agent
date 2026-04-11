@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AutoStream — AI Assistant</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,300&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet" />
+  <style>
+    /* ──────────────── TOKENS ──────────────── */
+    :root {
+      --ink: #0d1117;
+      --ink-2: #3a4558;
+      --ink-3: #7a8699;
+      --surface: #f6f8fb;
+      --surface-2: #ffffff;
+      --border: rgba(0,0,0,0.07);
+      --border-2: rgba(0,0,0,0.11);
+      --accent: #1a56db;
+      --accent-light: #dbe8ff;
+      --accent-glow: rgba(26,86,219,0.14);
+      --bubble-user-from: #1a56db;
+      --bubble-user-to: #2563eb;
+      --bubble-bot: #ffffff;
+      --error: #dc2626;
+      --error-bg: #fef2f2;
+      --error-border: #fecaca;
+      --warn-bg: #fffbeb;
+      --warn-border: #fde68a;
+      --radius-xl: 0px;
+      --radius-lg: 8px;
+      --radius-md: 6px;
+      --shadow-card: 0 32px 80px rgba(13,17,23,0.09), 0 2px 8px rgba(13,17,23,0.04);
+      --shadow-user: 0 8px 24px rgba(26,86,219,0.22);
+      --font-display: 'Fraunces', Georgia, serif;
+      --font-body: 'DM Sans', system-ui, sans-serif;
+      --easing: cubic-bezier(.22,.68,0,1.2);
+    }
+
+    /* ──────────────── RESET ──────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { height: 100%; -webkit-text-size-adjust: 100%; }
+    body {
+      height: 100%;
+      font-family: var(--font-body);
+      font-size: 15px;
+      color: var(--ink);
+      background: var(--surface);
+      margin: 0;
+    }
+
+    /* ──────────────── LAYOUT ──────────────── */
+    .shell {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--surface-2);
+      overflow: hidden;
+    }
+
+    /* ──────────────── HEADER ──────────────── */
+    .header {
+      flex-shrink: 0;
+      padding: 20px 24px 18px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,0.85);
+      backdrop-filter: blur(10px);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .logo {
+      width: 42px;
+      height: 42px;
+      border-radius: 8px;
+      background: linear-gradient(140deg, var(--accent), #3b82f6);
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+      box-shadow: 0 4px 14px rgba(26,86,219,0.28);
+    }
+
+    .logo svg { display: block; }
+
+    .header-text { flex: 1; min-width: 0; }
+    .header-title {
+      font-family: var(--font-display);
+      font-size: 1.08rem;
+      font-weight: 500;
+      letter-spacing: -0.01em;
+      color: var(--ink);
+      line-height: 1.2;
+    }
+    .header-sub {
+      font-size: 0.8rem;
+      color: var(--ink-3);
+      margin-top: 2px;
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 4px;
+      border: 1px solid var(--border-2);
+      background: #f0fdf4;
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: #16a34a;
+      white-space: nowrap;
+      user-select: none;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #22c55e;
+      box-shadow: 0 0 0 0 rgba(34,197,94,0.4);
+      animation: pulse-dot 2.2s infinite;
+    }
+
+    @keyframes pulse-dot {
+      0%,100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.4); }
+      50%      { box-shadow: 0 0 0 5px rgba(34,197,94,0); }
+    }
+
+    /* ──────────────── MESSAGES ──────────────── */
+    .chat-area {
+      flex: 1;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      padding: 20px 20px 8px;
+      scroll-behavior: smooth;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    /* Custom scrollbar */
+    .chat-area::-webkit-scrollbar { width: 5px; }
+    .chat-area::-webkit-scrollbar-track { background: transparent; }
+    .chat-area::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 99px; }
+
+    /* ── Empty state ── */
+    .empty-state {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 32px 24px;
+      gap: 12px;
+      animation: fade-up .5s .1s var(--easing) both;
+    }
+
+    @keyframes fade-up {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .empty-state.hidden { display: none; }
+
+    .empty-icon {
+      width: 60px;
+      height: 60px;
+      border-radius: 8px;
+      background: var(--accent-light);
+      display: grid;
+      place-items: center;
+      margin-bottom: 6px;
+    }
+
+    .empty-title {
+      font-family: var(--font-display);
+      font-size: 1.6rem;
+      font-weight: 400;
+      font-style: italic;
+      color: var(--ink);
+      letter-spacing: -0.02em;
+      line-height: 1.25;
+    }
+
+    .empty-desc {
+      font-size: 0.88rem;
+      color: var(--ink-3);
+      line-height: 1.65;
+      max-width: 300px;
+    }
+
+    .suggestion-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      margin-top: 6px;
+    }
+
+    .chip {
+      padding: 7px 14px;
+      border-radius: 4px;
+      border: 1px solid var(--border-2);
+      background: var(--surface);
+      font-size: 0.81rem;
+      color: var(--ink-2);
+      cursor: pointer;
+      transition: all .18s ease;
+      user-select: none;
+    }
+
+    .chip:hover {
+      background: var(--accent-light);
+      border-color: rgba(26,86,219,0.25);
+      color: var(--accent);
+      transform: translateY(-1px);
+    }
+
+    /* ── Message rows ── */
+    .message-row {
+      display: flex;
+      gap: 10px;
+      animation: msg-in .35s var(--easing) both;
+    }
+
+    @keyframes msg-in {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .message-row.user { flex-direction: row-reverse; margin-bottom: 6px; }
+    .message-row.assistant { margin-bottom: 6px; }
+
+    .avatar {
+      width: 30px;
+      height: 30px;
+      border-radius: 6px;
+      flex-shrink: 0;
+      display: grid;
+      place-items: center;
+      margin-top: 2px;
+    }
+
+    .avatar.bot {
+      background: linear-gradient(140deg, var(--accent), #3b82f6);
+      box-shadow: 0 2px 8px rgba(26,86,219,0.22);
+    }
+
+    .avatar.user-av {
+      background: var(--surface);
+      border: 1px solid var(--border-2);
+    }
+
+    .bubble {
+      max-width: min(72%, 560px);
+      padding: 12px 16px;
+      font-size: 0.92rem;
+      line-height: 1.6;
+      word-break: break-word;
+      white-space: pre-wrap;
+    }
+
+    .message-row.user .bubble {
+      background: linear-gradient(135deg, var(--bubble-user-from), var(--bubble-user-to));
+      color: #fff;
+      border-radius: var(--radius-lg) var(--radius-lg) 6px var(--radius-lg);
+      box-shadow: var(--shadow-user);
+    }
+
+    .message-row.assistant .bubble {
+      background: var(--bubble-bot);
+      color: var(--ink);
+      border: 1px solid var(--border-2);
+      border-radius: var(--radius-lg) var(--radius-lg) var(--radius-lg) 6px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    }
+
+    /* ── Error bubble ── */
+    .bubble.error-bubble {
+      background: var(--error-bg);
+      border-color: var(--error-border);
+      color: var(--error);
+    }
+
+    .bubble.warn-bubble {
+      background: var(--warn-bg);
+      border-color: var(--warn-border);
+      color: #92400e;
+    }
+
+    /* ── Timestamp ── */
+    .ts {
+      font-size: 0.72rem;
+      color: var(--ink-3);
+      margin: 0 4px;
+      display: flex;
+      align-items: flex-end;
+      padding-bottom: 4px;
+      white-space: nowrap;
+      opacity: 0;
+      transition: opacity .2s;
+    }
+
+    .message-row:hover .ts { opacity: 1; }
+
+    /* ── Typing indicator ── */
+    .typing-row {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      animation: msg-in .3s var(--easing) both;
+    }
+
+    .typing-row.hidden { display: none; }
+
+    .typing-bubble {
+      padding: 14px 18px;
+      background: var(--bubble-bot);
+      border: 1px solid var(--border-2);
+      border-radius: var(--radius-lg) var(--radius-lg) var(--radius-lg) 6px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .typing-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--ink-3);
+      animation: bounce-dot 1.3s infinite ease-in-out;
+    }
+
+    .typing-dot:nth-child(2) { animation-delay: .15s; }
+    .typing-dot:nth-child(3) { animation-delay: .30s; }
+
+    @keyframes bounce-dot {
+      0%,60%,100% { transform: translateY(0); opacity: .5; }
+      30%          { transform: translateY(-6px); opacity: 1; }
+    }
+
+    /* ── Retry button inside error bubble ── */
+    .retry-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      margin-top: 8px;
+      padding: 5px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(220,38,38,0.3);
+      background: transparent;
+      color: var(--error);
+      font-size: 0.78rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background .15s;
+      min-width: unset;
+    }
+
+    .retry-btn:hover { background: rgba(220,38,38,0.07); }
+
+    /* ──────────────── TOAST NOTIFICATION ──────────────── */
+    .toast-container {
+      position: absolute;
+      top: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 99;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+      width: min(360px, 90%);
+    }
+
+    .toast {
+      padding: 10px 16px;
+      border-radius: 12px;
+      font-size: 0.83rem;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+      pointer-events: all;
+      animation: toast-in .3s var(--easing) both;
+    }
+
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateY(-10px) scale(.95); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .toast.removing {
+      animation: toast-out .25s ease forwards;
+    }
+
+    @keyframes toast-out {
+      to { opacity: 0; transform: translateY(-8px) scale(.96); }
+    }
+
+    .toast.error { background: var(--error-bg); border: 1px solid var(--error-border); color: var(--error); }
+    .toast.warn  { background: var(--warn-bg);  border: 1px solid var(--warn-border);  color: #92400e; }
+    .toast.info  { background: var(--accent-light); border: 1px solid rgba(26,86,219,0.2); color: var(--accent); }
+
+    /* ──────────────── COMPOSER ──────────────── */
+    .composer {
+      flex-shrink: 0;
+      padding: 12px 16px 16px;
+      border-top: 1px solid var(--border);
+      background: rgba(255,255,255,0.92);
+      backdrop-filter: blur(8px);
+    }
+
+    .input-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+    }
+
+    .input-wrap {
+      flex: 1;
+      position: relative;
+    }
+
+    textarea {
+      width: 100%;
+      resize: none;
+      border: 1.5px solid var(--border-2);
+      background: var(--surface);
+      color: var(--ink);
+      border-radius: var(--radius-md);
+      padding: 12px 44px 12px 16px;
+      font-size: 0.93rem;
+      font-family: var(--font-body);
+      line-height: 1.5;
+      max-height: 140px;
+      min-height: 48px;
+      outline: none;
+      overflow-y: auto;
+      transition: border-color .18s, box-shadow .18s;
+    }
+
+    textarea::placeholder { color: var(--ink-3); }
+
+    textarea:focus {
+      border-color: rgba(26,86,219,0.45);
+      box-shadow: 0 0 0 3.5px rgba(26,86,219,0.1);
+      background: #fff;
+    }
+
+    .char-count {
+      position: absolute;
+      right: 12px;
+      bottom: 10px;
+      font-size: 0.7rem;
+      color: var(--ink-3);
+      pointer-events: none;
+      transition: color .15s;
+    }
+
+    .char-count.warn { color: #f59e0b; }
+    .char-count.over { color: var(--error); }
+
+    .send-btn {
+      width: 48px;
+      height: 48px;
+      min-width: unset;
+      border-radius: 14px;
+      background: linear-gradient(135deg, var(--accent), #2563eb);
+      border: 0;
+      color: #fff;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      box-shadow: 0 4px 14px rgba(26,86,219,0.28);
+      transition: transform .18s var(--easing), box-shadow .18s, opacity .15s;
+    }
+
+    .send-btn:hover:not(:disabled) {
+      transform: translateY(-2px) scale(1.04);
+      box-shadow: 0 8px 22px rgba(26,86,219,0.35);
+    }
+
+    .send-btn:active:not(:disabled) { transform: scale(.96); }
+
+    .send-btn:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .composer-foot {
+      margin-top: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      color: var(--ink-3);
+      padding: 0 2px;
+    }
+
+    .composer-foot kbd {
+      display: inline-block;
+      padding: 1px 5px;
+      border-radius: 4px;
+      border: 1px solid var(--border-2);
+      background: var(--surface);
+      font-family: var(--font-body);
+      font-size: 0.7rem;
+      color: var(--ink-2);
+    }
+
+    /* ──────────────── NETWORK BANNER ──────────────── */
+    .offline-banner {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 16px;
+      background: var(--warn-bg);
+      border-top: 1px solid var(--warn-border);
+      border-bottom: 1px solid var(--warn-border);
+      font-size: 0.82rem;
+      color: #92400e;
+      font-weight: 500;
+    }
+
+    .offline-banner.visible { display: flex; }
+
+    /* ──────────────── RESPONSIVE ──────────────── */
+    @media (max-width: 600px) {
+      body { align-items: flex-end; }
+
+      .shell {
+        width: 100vw;
+        height: 100svh;
+        border-radius: 0;
+        border: none;
+        animation: none;
+      }
+
+      .header { padding: 14px 16px 12px; }
+      .chat-area { padding: 14px 12px 6px; }
+      .composer { padding: 10px 12px 14px; }
+
+      .bubble { max-width: 86%; }
+      .status-badge { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- ── Header ── -->
+  <header class="header">
+    <div class="logo">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+        <path d="M11 2L14.5 8.5H19L15 13L16.5 20L11 16.5L5.5 20L7 13L3 8.5H7.5L11 2Z" fill="white" fill-opacity=".9"/>
+      </svg>
+    </div>
+    <div class="header-text">
+      <div class="header-title">AutoStream</div>
+      <div class="header-sub">AI-powered product assistant</div>
+    </div>
+    <div class="status-badge" id="statusBadge">
+      <span class="status-dot"></span>
+      Online
+    </div>
+  </header>
+
+  <!-- ── Offline banner ── -->
+  <div class="offline-banner" id="offlineBanner">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M1 6s4-4 11-4 11 4 11 4"/><path d="M5 10s3.5-3 7-3 7 3 7 3"/><path d="M9 14s2-2 3-2 3 2 3 2"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+    You're offline — messages will be sent when your connection is restored.
+  </div>
+
+  <!-- ── Toast container ── -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- ── Chat area ── -->
+  <div class="chat-area" id="chatArea" role="log" aria-live="polite" aria-label="Chat messages">
+
+    <!-- Empty state -->
+    <div class="empty-state" id="emptyState">
+      <div class="empty-icon">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+          <path d="M14 3C8.477 3 4 7.477 4 13c0 2.136.69 4.112 1.857 5.71L4.5 23l4.658-1.333A9.955 9.955 0 0014 23c5.523 0 10-4.477 10-10S19.523 3 14 3Z" fill="var(--accent)" fill-opacity=".15" stroke="var(--accent)" stroke-width="1.5" stroke-linejoin="round"/>
+          <circle cx="10" cy="13" r="1.2" fill="var(--accent)"/>
+          <circle cx="14" cy="13" r="1.2" fill="var(--accent)"/>
+          <circle cx="18" cy="13" r="1.2" fill="var(--accent)"/>
+        </svg>
+      </div>
+      <div class="empty-title">How can I help you today?</div>
+      <div class="empty-desc">Ask about pricing, features, or anything about AutoStream. I'm here to make it easy.</div>
+      <div class="suggestion-chips">
+        <button class="chip" onclick="sendSuggestion('What are your pricing plans?')">💳 Pricing plans</button>
+        <button class="chip" onclick="sendSuggestion('What features does AutoStream offer?')">✨ Key features</button>
+        <button class="chip" onclick="sendSuggestion('I want to get started.')">🚀 Get started</button>
+        <button class="chip" onclick="sendSuggestion('How does support work?')">🛟 Support</button>
+      </div>
+    </div>
+
+    <!-- Typing indicator -->
+    <div class="typing-row hidden" id="typingRow">
+      <div class="avatar bot">
+        <svg width="14" height="14" viewBox="0 0 22 22" fill="none">
+          <path d="M11 2L14.5 8.5H19L15 13L16.5 20L11 16.5L5.5 20L7 13L3 8.5H7.5L11 2Z" fill="white" fill-opacity=".9"/>
+        </svg>
+      </div>
+      <div class="typing-bubble">
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Composer ── -->
+  <div class="composer">
+    <div class="input-row">
+      <div class="input-wrap">
+        <textarea
+          id="messageInput"
+          placeholder="Type a message…"
+          rows="1"
+          maxlength="2000"
+          aria-label="Message input"
+          autocomplete="off"
+          spellcheck="true"
+        ></textarea>
+        <span class="char-count" id="charCount" aria-hidden="true"></span>
+      </div>
+      <button class="send-btn" id="sendBtn" aria-label="Send message" disabled>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+        </svg>
+      </button>
+    </div>
+    <div class="composer-foot">
+      <span>Press <kbd>Enter</kbd> to send &nbsp;·&nbsp; <kbd>Shift</kbd>+<kbd>Enter</kbd> for new line</span>
+      <span id="footStatus"></span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  /* ─── Elements ─── */
+  const chatArea    = document.getElementById('chatArea');
+  const emptyState  = document.getElementById('emptyState');
+  const typingRow   = document.getElementById('typingRow');
+  const input       = document.getElementById('messageInput');
+  const sendBtn     = document.getElementById('sendBtn');
+  const charCount   = document.getElementById('charCount');
+  const footStatus  = document.getElementById('footStatus');
+  const toastCont   = document.getElementById('toastContainer');
+  const offlineBanner = document.getElementById('offlineBanner');
+  const statusBadge = document.getElementById('statusBadge');
+
+  const MAX_CHARS = 2000;
+  const CHAR_WARN = 1800;
+
+  let isLoading = false;
+  let lastUserMessage = '';
+  let retryCount = 0;
+  const MAX_RETRIES = 2;
+  let abortController = null;
+
+  /* ─── Textarea auto-grow ─── */
+  input.addEventListener('input', () => {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 140) + 'px';
+
+    const len = input.value.length;
+    sendBtn.disabled = len === 0 || isLoading;
+
+    if (len > CHAR_WARN) {
+      charCount.textContent = `${len}/${MAX_CHARS}`;
+      charCount.className = 'char-count' + (len >= MAX_CHARS ? ' over' : ' warn');
+    } else {
+      charCount.textContent = '';
+      charCount.className = 'char-count';
+    }
+  });
+
+  /* ─── Enter to send ─── */
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey && !isLoading) {
+      e.preventDefault();
+      attemptSend();
+    }
+  });
+
+  sendBtn.addEventListener('click', attemptSend);
+
+  /* ─── Suggestion chips ─── */
+  function sendSuggestion(text) {
+    input.value = text;
+    input.dispatchEvent(new Event('input'));
+    attemptSend();
+  }
+
+  /* ─── Helpers ─── */
+  function now() {
+    return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function scrollToBottom(smooth = true) {
+    chatArea.scrollTo({ top: chatArea.scrollHeight, behavior: smooth ? 'smooth' : 'instant' });
+  }
+
+  function hideEmpty() {
+    emptyState.classList.add('hidden');
+  }
+
+  function setLoading(val) {
+    isLoading = val;
+    sendBtn.disabled = val || input.value.trim().length === 0;
+    input.readOnly = val;
+    typingRow.classList.toggle('hidden', !val);
+    if (val) {
+      chatArea.appendChild(typingRow);
+      scrollToBottom();
+    }
+  }
+
+  function setFootStatus(msg, color = '') {
+    footStatus.textContent = msg;
+    footStatus.style.color = color;
+  }
+
+  /* ─── Add message to DOM ─── */
+  function addMessage(role, text, { isError = false, isWarn = false, showRetry = false } = {}) {
+    hideEmpty();
+
+    const row = document.createElement('div');
+    row.className = `message-row ${role}`;
+
+    const avatar = document.createElement('div');
+    avatar.className = `avatar ${role === 'assistant' ? 'bot' : 'user-av'}`;
+    avatar.innerHTML = role === 'assistant'
+      ? `<svg width="14" height="14" viewBox="0 0 22 22" fill="none"><path d="M11 2L14.5 8.5H19L15 13L16.5 20L11 16.5L5.5 20L7 13L3 8.5H7.5L11 2Z" fill="white" fill-opacity=".9"/></svg>`
+      : `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ink-2)" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
+
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble' + (isError ? ' error-bubble' : '') + (isWarn ? ' warn-bubble' : '');
+    bubble.textContent = text;
+
+    if (showRetry) {
+      const retryBtn = document.createElement('button');
+      retryBtn.className = 'retry-btn';
+      retryBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> Retry`;
+      retryBtn.addEventListener('click', () => {
+        row.remove();
+        if (lastUserMessage) sendMessage(lastUserMessage);
+      });
+      bubble.appendChild(document.createElement('br'));
+      bubble.appendChild(retryBtn);
+    }
+
+    const ts = document.createElement('div');
+    ts.className = 'ts';
+    ts.textContent = now();
+    ts.setAttribute('aria-hidden', 'true');
+
+    if (role === 'user') {
+      row.appendChild(ts);
+      row.appendChild(bubble);
+      row.appendChild(avatar);
+    } else {
+      row.appendChild(avatar);
+      row.appendChild(bubble);
+      row.appendChild(ts);
+    }
+
+    // Insert before typing row
+    chatArea.insertBefore(row, typingRow);
+    scrollToBottom();
+    return row;
+  }
+
+  /* ─── Toast ─── */
+  function showToast(msg, type = 'error', duration = 4000) {
+    const icons = {
+      error: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+      warn:  `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
+      info:  `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`,
+    };
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.innerHTML = `${icons[type] || ''} <span>${msg}</span>`;
+    toastCont.appendChild(toast);
+
+    setTimeout(() => {
+      toast.classList.add('removing');
+      toast.addEventListener('animationend', () => toast.remove(), { once: true });
+    }, duration);
+  }
+
+  /* ─── Network detection ─── */
+  function updateOnlineStatus() {
+    const online = navigator.onLine;
+    offlineBanner.classList.toggle('visible', !online);
+    statusBadge.style.opacity = online ? '1' : '0.5';
+  }
+
+  window.addEventListener('online',  () => { updateOnlineStatus(); showToast("You're back online!", 'info', 3000); });
+  window.addEventListener('offline', () => { updateOnlineStatus(); });
+  updateOnlineStatus();
+
+  /* ─── Main send logic ─── */
+  function attemptSend() {
+    const text = input.value.trim();
+    if (!text || isLoading) return;
+    if (!navigator.onLine) {
+      showToast("You're offline. Please check your connection.", 'warn');
+      return;
+    }
+    if (text.length > MAX_CHARS) {
+      showToast(`Message too long. Keep it under ${MAX_CHARS} characters.`, 'warn');
+      return;
+    }
+    lastUserMessage = text;
+    retryCount = 0;
+    sendMessage(text);
+  }
+
+  async function sendMessage(text) {
+    addMessage('user', text);
+    input.value = '';
+    input.style.height = 'auto';
+    charCount.textContent = '';
+    charCount.className = 'char-count';
+    setLoading(true);
+    setFootStatus('');
+
+    // Cancel any prior in-flight request
+    if (abortController) abortController.abort();
+    abortController = new AbortController();
+    const signal = abortController.signal;
+
+    // Timeout: 30 s
+    const timeoutId = setTimeout(() => abortController.abort(), 30000);
+
+    try {
+      const res = await fetch('/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text }),
+        signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      // HTTP error handling
+      if (!res.ok) {
+        let errMsg = `Server error (${res.status})`;
+        try {
+          const errData = await res.json();
+          if (errData?.error) errMsg = errData.error;
+        } catch (_) {}
+
+        if (res.status === 429) {
+          addMessage('assistant', 'You\'re sending messages too quickly. Please wait a moment and try again.', { isWarn: true });
+          showToast('Rate limited — slow down a bit.', 'warn');
+        } else if (res.status >= 500) {
+          addMessage('assistant', 'The server encountered an error. Please try again in a moment.', { isError: true, showRetry: retryCount < MAX_RETRIES });
+          showToast(errMsg, 'error');
+        } else {
+          addMessage('assistant', errMsg, { isError: true });
+          showToast(errMsg, 'error');
+        }
+        return;
+      }
+
+      // Parse response
+      let data;
+      try {
+        data = await res.json();
+      } catch (_) {
+        throw new Error('Received an unreadable response from the server.');
+      }
+
+      if (!data?.reply || typeof data.reply !== 'string') {
+        throw new Error('The server returned an unexpected response format.');
+      }
+
+      addMessage('assistant', data.reply);
+
+    } catch (err) {
+      clearTimeout(timeoutId);
+
+      if (err.name === 'AbortError') {
+        addMessage('assistant', 'The request timed out. Please check your connection and try again.', { isError: true, showRetry: retryCount < MAX_RETRIES });
+        showToast('Request timed out.', 'error');
+      } else if (!navigator.onLine) {
+        addMessage('assistant', 'You appear to be offline. Please reconnect and try again.', { isWarn: true });
+        showToast("You're offline.", 'warn');
+      } else {
+        addMessage('assistant', err.message || 'Something went wrong. Please try again.', { isError: true, showRetry: retryCount < MAX_RETRIES });
+        showToast(err.message || 'Unexpected error.', 'error');
+      }
+    } finally {
+      setLoading(false);
+      input.focus();
+      setFootStatus('');
+    }
+  }
+
+  /* ─── Auto-focus on load ─── */
+  input.focus();
+</script>
+</body>
+</html>

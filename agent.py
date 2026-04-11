@@ -43,18 +43,14 @@ Rules:
 conversation_history = []
 lead_captured = False
 
-print("Chat with AutoStream. Type 'quit' to exit.\n")
+WELCOME_MESSAGE = "Hi, I'm the AutoStream assistant. Ask about pricing, features, or getting started."
 
-while True:
-    query = input("You: ").strip()
-
-    if query.lower() == 'quit':
-        break
+def chat_once(query):
+    global lead_captured
 
     conversation_history.append(HumanMessage(content=query))
 
     messages = [SystemMessage(content=SYSTEM_PROMPT)] + conversation_history
-
     response = model.invoke(messages)
     response_text = response.content
 
@@ -68,7 +64,24 @@ while True:
             lead_captured = True
             response_text = f"Perfect! I've captured your details successfully. Welcome to AutoStream, {name}! We'll be in touch at {email} soon."
         except Exception:
-            response_text = "I had trouble saving your details. Could you please share your name, email, and platform again?"
+            response_text = "I had trouble saving your details. Could you please share your name, email, and platform again."
 
     conversation_history.append(AIMessage(content=response_text))
-    print(f"Assistant: {response_text}\n")
+    return response_text
+
+
+def run_cli():
+    print("Chat with AutoStream. Type 'quit' to exit.\n")
+
+    while True:
+        query = input("You: ").strip()
+
+        if query.lower() == "quit":
+            break
+
+        response_text = chat_once(query)
+        print(f"Assistant: {response_text}\n")
+
+
+if __name__ == "__main__":
+    run_cli()
